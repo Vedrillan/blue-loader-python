@@ -18,6 +18,17 @@
 """
 
 import argparse
+import os
+import sys
+import struct
+
+if sys.version_info.major == 3:
+	import urllib.request as urllib2
+	import urllib.parse as urlparse
+else:
+	import urllib2, urlparse
+from .BlueHSMServer_pb2 import Request, Response, Parameter
+from .comm import getDongle
 
 def get_argparser():
 	parser = argparse.ArgumentParser("Update the firmware by using Ledger to open a Secure Channel.")
@@ -30,13 +41,15 @@ Issuer keypair used by Ledger to sign the device's Issuer Certificate""", defaul
 	parser.add_argument("--firmwareKey", help="A reference to the firmware key to use")
 	return parser
 
+
 def auto_int(x):
 	return int(x, 0)
 
+
 def serverQuery(request, url):
 	data = request.SerializeToString()
-	urll = urlparse.urlparse(args.url)
-	req = urllib2.Request(args.url, data, {"Content-type": "application/octet-stream" })
+	urll = urlparse.urlparse(url)
+	req = urllib2.Request(url, data, {"Content-type": "application/octet-stream" })
 	res = urllib2.urlopen(req)
 	data = res.read()
 	response = Response()
@@ -45,20 +58,9 @@ def serverQuery(request, url):
 		raise Exception(response.exception)
 	return response
 
-if __name__ == '__main__':
-	import sys
-	import os
-	import struct
-	if sys.version_info.major == 3:
-		import urllib.request as urllib2
-		import urllib.parse as urlparse
-	else:
-		import urllib2, urlparse	
-	from .BlueHSMServer_pb2 import Request, Response, Parameter
-	from .comm import getDongle
-	import sys
 
-	args = get_argparser().parse_args()
+def execute(arguments=None):
+	args = get_argparser().parse_args(arguments)
 	if args.url == None:
 		raise Exception("No URL specified")
 	if args.perso == None:
@@ -122,7 +124,7 @@ if __name__ == '__main__':
 	parameter.local = False
 	parameter.alias = "persoKey"
 	parameter.name = args.perso
-	request.parameters = bytes(deviceNonce)	
+	request.parameters = bytes(deviceNonce)
 	request.largeStack = True
 
 	response = serverQuery(request, args.url)
@@ -168,7 +170,7 @@ if __name__ == '__main__':
 		parameter = request.remote_parameters.add()
 		parameter.local = False
 		parameter.alias = "scpv2"
-		parameter.name = "dummy"	
+		parameter.name = "dummy"
 	request.id = response.id
 	request.largeStack = True
 
@@ -216,3 +218,9 @@ if __name__ == '__main__':
 		apdu = responseData[offset : offset + 5 + responseData[offset + 4]]
 		dongle.exchange(apdu)
 		offset += 5 + responseData[offset + 4]
+
+	dongle.close()
+
+
+if __name__ == '__main__':
+	execute()
